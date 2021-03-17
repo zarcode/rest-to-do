@@ -1,2 +1,1 @@
-# rest-to-do
-REST API to do app
+# to-do-app
