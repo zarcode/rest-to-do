@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 119f61e3607083cbc32f784248c651687d8c45d737082b0150f479be6ba7db8f
+-- hash: 33ffdb9b72ef0f2a02f845b673d4803137b91517d42541357ee705077d902ad8
 
 name:           to-do-app
 version:        0.1.0.0
@@ -40,6 +40,7 @@ library
     , servant
     , servant-server
     , string-conversions
+    , text
     , time
     , transformers
     , wai
@@ -63,6 +64,7 @@ executable to-do-app-exe
     , servant
     , servant-server
     , string-conversions
+    , text
     , time
     , to-do-app
     , transformers
@@ -91,6 +93,7 @@ test-suite to-do-app-test
     , servant
     , servant-server
     , string-conversions
+    , text
     , time
     , to-do-app
     , transformers

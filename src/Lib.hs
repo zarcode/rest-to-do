@@ -2,6 +2,8 @@
 {-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators   #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Lib
     ( startApp
     , app
@@ -15,11 +17,14 @@ import qualified Data.ByteString.Char8 as BS
 import           Data.List.Safe ((!!))
 import qualified Data.Yaml as Yaml
 import           Data.Time
+import           Data.Text
+import           Data.String.Conversions (cs)
 import           GHC.Generics
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Prelude hiding ((!!))
 import           Servant
+import           Servant.API.ContentTypes
 import           System.Directory
 import           System.IO.Error
 
@@ -46,6 +51,17 @@ data ToDoList = ToDoList [Item] deriving (Generic, Show)
 instance ToJSON ToDoList
 instance FromJSON ToDoList
 
+data APIError = APIError
+    { code:: Int
+    , message:: Text
+    } deriving (Generic, Show)
+instance ToJSON APIError
+instance FromJSON APIError
+
+fileCorruptedError = Data.Aeson.encode $ APIError 500 "YAML file is corrupt"
+cantFindItemError = Data.Aeson.encode $ APIError 404 "Invalid item index"
+notFoundError req = Data.Aeson.encode $ APIError 404 (cs $ "Not found path: " <> rawPathInfo req)
+
 -- $(deriveJSON defaultOptions ''Item)
 
 type API = "todos" :> Get '[JSON] ToDoList
@@ -54,52 +70,75 @@ type API = "todos" :> Get '[JSON] ToDoList
 startApp :: IO ()
 startApp = run 8080 app
 
+customFormatter :: ErrorFormatter
+customFormatter tr req err =
+  let
+    -- aeson Value which will be sent to the client
+    value = object ["combinator" .= show tr, "error" .= err]
+    -- Accept header of the request
+    accH = getAcceptHeader req
+  in
+  -- handleAcceptH is Servant's function that checks whether the client can accept a
+  -- certain message type.
+  -- In this case we call it with "Proxy '[JSON]" argument, meaning that we want to return a JSON.
+  case handleAcceptH (Proxy :: Proxy '[JSON]) accH value of
+    -- If client can't handle JSON, we just return the body the old way
+    Nothing -> err400 { errBody = cs err }
+    -- Otherwise, we return the JSON formatted body and set the "Content-Type" header.
+    Just (ctypeH, body) -> err400
+      { errBody = body
+      , errHeaders = [("Content-Type", cs ctypeH)]
+      }
+
+notFoundFormatter :: NotFoundErrorFormatter
+notFoundFormatter req =
+  err404 { errBody = notFoundError req }
+
+customFormatters :: ErrorFormatters
+customFormatters = defaultErrorFormatters
+  { bodyParserErrorFormatter = customFormatter
+  , notFoundErrorFormatter = notFoundFormatter
+  }
+
 app :: Application
-app = serve api server
+-- app = serve api server
+app = serveWithContext api (customFormatters :. EmptyContext) server
 
 api :: Proxy API
 api = Proxy
 
 server :: Server API
--- server = liftIO (readToDoList defaultDataPath)
 
 server = todos
      :<|> todo
 
-  where todos :: Servant.Handler ToDoList
-        todos = liftIO $ viewItems defaultDataPath
-
-        todo :: Int -> Servant.Handler Item
-        todo id = liftIO $ viewItem defaultDataPath id
-
--- users :: ToDoList
--- users = ToDoList [ Item 1 "Isaac" "Newton", Item 2 "Albert" "Einstein"]
+  where 
+    todos = readToDoList defaultDataPath
+    todo id = viewItem defaultDataPath id
 
 defaultDataPath :: FilePath
 defaultDataPath = "todos.yaml"
 -- defaultDataPath = "~/.users.yaml"
 
-readToDoList :: FilePath -> IO ToDoList
-readToDoList dataPath = do
-    mbToDoList <- catchJust
-        (\e -> if isDoesNotExistError e then Just () else Nothing)
-        (BS.readFile dataPath >>= return . Yaml.decode)
-        (\_ -> return $ Just (ToDoList []))
-    case mbToDoList of
-        Nothing -> error "YAML file is corrupt"
-        Just toDoList -> return toDoList
+readYamlFile :: FilePath -> IO (Maybe ToDoList)
+readYamlFile dataPath = catchJust
+            (\e -> if isDoesNotExistError e then Just () else Nothing)
+            (BS.readFile dataPath >>= return . Yaml.decode)
+            (\_ -> return $ Just (ToDoList []))
 
-viewItem :: FilePath -> ItemIndex -> IO Item
+readToDoList :: FilePath -> Servant.Handler ToDoList 
+readToDoList dataPath = do
+  mbToDoList <- liftIO $ readYamlFile dataPath
+  case mbToDoList of
+    Just toDoList -> return toDoList
+    Nothing -> throwError err500 { errBody = fileCorruptedError }
+
+
+viewItem :: FilePath -> ItemIndex -> Servant.Handler Item
 viewItem dataPath idx = do
     ToDoList items <- readToDoList dataPath
     let mbItem = items !! idx
     case mbItem of
-        Nothing -> error "Invalid item index"
         Just item -> return item
-    
-
-viewItems :: FilePath -> IO ToDoList
-viewItems = readToDoList
-
--- run :: FilePath -> IO ()
--- run dataPath List = viewItems dataPath
+        Nothing -> throwError err404 { errBody = cantFindItemError }
+  
