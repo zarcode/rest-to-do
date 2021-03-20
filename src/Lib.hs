@@ -52,19 +52,19 @@ instance ToJSON ToDoList
 instance FromJSON ToDoList
 
 data APIError = APIError
-    { code:: Int
-    , message:: Text
+    { message:: Text
     } deriving (Generic, Show)
 instance ToJSON APIError
 instance FromJSON APIError
 
-fileCorruptedError = Data.Aeson.encode $ APIError 500 "YAML file is corrupt"
-cantFindItemError = Data.Aeson.encode $ APIError 404 "Invalid item index"
-notFoundError req = Data.Aeson.encode $ APIError 404 (cs $ "Not found path: " <> rawPathInfo req)
+fileCorruptedError = Data.Aeson.encode $ APIError "YAML file is corrupt"
+cantFindItemError = Data.Aeson.encode $ APIError "Invalid item index"
+notFoundError req = Data.Aeson.encode $ APIError (cs $ "Not found path: " <> rawPathInfo req)
 
 -- $(deriveJSON defaultOptions ''Item)
 
 type API = "todos" :> Get '[JSON] ToDoList
+      :<|> "todos" :> ReqBody '[JSON] Item :> Post '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> Get '[JSON] Item
 
 startApp :: IO ()
@@ -74,7 +74,7 @@ customFormatter :: ErrorFormatter
 customFormatter tr req err =
   let
     -- aeson Value which will be sent to the client
-    value = object ["combinator" .= show tr, "error" .= err]
+    value = APIError $ cs err
     -- Accept header of the request
     accH = getAcceptHeader req
   in
@@ -110,10 +110,12 @@ api = Proxy
 server :: Server API
 
 server = todos
+     :<|> addTodoItem
      :<|> todo
 
   where 
     todos = readToDoList defaultDataPath
+    addTodoItem item = addItem defaultDataPath item
     todo id = viewItem defaultDataPath id
 
 defaultDataPath :: FilePath
@@ -133,6 +135,18 @@ readToDoList dataPath = do
     Just toDoList -> return toDoList
     Nothing -> throwError err500 { errBody = fileCorruptedError }
 
+writeYamlFile :: FilePath -> ToDoList -> IO ()
+writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
+
+writeToDoList :: FilePath -> ToDoList -> Servant.Handler ()
+writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList  
+
+addItem :: FilePath -> Item -> Servant.Handler Item
+addItem dataPath item = do
+    ToDoList items <- readToDoList dataPath
+    let toDoList = ToDoList (item : items)
+    writeToDoList dataPath toDoList
+    return item
 
 viewItem :: FilePath -> ItemIndex -> Servant.Handler Item
 viewItem dataPath idx = do
