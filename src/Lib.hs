@@ -76,6 +76,7 @@ type API = "todos" :> Get '[JSON] ToDoList
       :<|> "todos" :> ReqBody '[JSON] Item :> Post '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> Get '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> ReqBody '[JSON] ItemUpdate :> Post '[JSON] Item
+      :<|> "todo" :> Capture "id" Int :> Delete '[JSON] NoContent
 
 startApp :: IO ()
 startApp = run 8080 app
@@ -123,6 +124,7 @@ server = todos
      :<|> todosAdd
      :<|> todo
      :<|> todoUpdate
+     :<|> todoDelete
 
   where 
     todos = readToDoList defaultDataPath
@@ -130,6 +132,7 @@ server = todos
     todo id = viewItem defaultDataPath id
     todoUpdate :: Int -> ItemUpdate -> Servant.Handler Item
     todoUpdate id itemUpdate = updateItem defaultDataPath id itemUpdate
+    todoDelete id = removeItem defaultDataPath id
 
 defaultDataPath :: FilePath
 defaultDataPath = "todos.yaml"
@@ -197,3 +200,24 @@ updateAt xs idx f =
             newElement = f element
             xs' = before ++ newElement : after'
         in Just (xs', newElement)
+
+removeItem :: FilePath -> ItemIndex -> Servant.Handler NoContent 
+removeItem dataPath idx = do
+    ToDoList items <- readToDoList dataPath
+    let mbItems = items `removeAt` idx
+    case mbItems of
+        Nothing -> throwError err404 { errBody = cantFindItemError }
+        Just items' -> do
+            let toDoList = ToDoList items'
+            writeToDoList dataPath toDoList
+            return NoContent
+
+removeAt :: [a] -> Int -> Maybe [a]
+removeAt xs idx =
+    if idx < 0 || idx >= length xs
+    then Nothing
+    else
+        let (before, after) = splitAt idx xs
+            _ : after' = after
+            xs' = before ++ after'
+        in Just xs'

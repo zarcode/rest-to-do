@@ -2,10 +2,6 @@
   priority: Normal
   title: Title
   description: DESCRIPTION
-- dueBy: null
-  priority: Normal
-  title: Change2
-  description: DESCRIPTION
 - dueBy: 2010-08-21T12:00:00
   priority: Normal
   title: NEW
