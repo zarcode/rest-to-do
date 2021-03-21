@@ -17,7 +17,7 @@ import qualified Data.ByteString.Char8 as BS
 import           Data.List.Safe ((!!))
 import qualified Data.Yaml as Yaml
 import           Data.Time
-import           Data.Text
+-- import           Data.Text
 import           Data.String.Conversions (cs)
 import           GHC.Generics
 import           Network.Wai
@@ -47,12 +47,21 @@ data Item = Item
 instance ToJSON Item
 instance FromJSON Item
 
+data ItemUpdate = ItemUpdate
+    { titleUpdate :: Maybe ItemTitle
+    , descriptionUpdate :: Maybe ItemDescription
+    , priorityUpdate :: Maybe ItemPriority
+    , dueByUpdate :: Maybe ItemDueBy
+    } deriving (Generic, Show)
+instance ToJSON ItemUpdate
+instance FromJSON ItemUpdate
+
 data ToDoList = ToDoList [Item] deriving (Generic, Show)
 instance ToJSON ToDoList
 instance FromJSON ToDoList
 
 data APIError = APIError
-    { message:: Text
+    { message:: String
     } deriving (Generic, Show)
 instance ToJSON APIError
 instance FromJSON APIError
@@ -66,6 +75,7 @@ notFoundError req = Data.Aeson.encode $ APIError (cs $ "Not found path: " <> raw
 type API = "todos" :> Get '[JSON] ToDoList
       :<|> "todos" :> ReqBody '[JSON] Item :> Post '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> Get '[JSON] Item
+      :<|> "todo" :> Capture "id" Int :> ReqBody '[JSON] ItemUpdate :> Post '[JSON] Item
 
 startApp :: IO ()
 startApp = run 8080 app
@@ -110,13 +120,16 @@ api = Proxy
 server :: Server API
 
 server = todos
-     :<|> addTodoItem
+     :<|> todosAdd
      :<|> todo
+     :<|> todoUpdate
 
   where 
     todos = readToDoList defaultDataPath
-    addTodoItem item = addItem defaultDataPath item
+    todosAdd item = addItem defaultDataPath item
     todo id = viewItem defaultDataPath id
+    todoUpdate :: Int -> ItemUpdate -> Servant.Handler Item
+    todoUpdate id itemUpdate = updateItem defaultDataPath id itemUpdate
 
 defaultDataPath :: FilePath
 defaultDataPath = "todos.yaml"
@@ -156,3 +169,31 @@ viewItem dataPath idx = do
         Just item -> return item
         Nothing -> throwError err404 { errBody = cantFindItemError }
   
+updateItem :: FilePath -> ItemIndex -> ItemUpdate -> Servant.Handler Item
+updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = do
+    ToDoList items <- readToDoList dataPath
+    let update (Item title description priority dueBy) = Item
+            (updateField mbTitle title)
+            (updateField mbDescription description)
+            (updateField mbPriority priority)
+            (updateField mbDueBy dueBy)
+        updateField (Just value) _ = value
+        updateField Nothing value = value
+        updateResult = updateAt items idx update
+    case updateResult of
+        Nothing -> throwError err404 { errBody = cantFindItemError }
+        Just (items', changedItem) -> do
+            let toDoList = ToDoList items'
+            writeToDoList dataPath toDoList
+            return changedItem
+
+updateAt :: [a] -> Int -> (a -> a) -> Maybe ([a], a)
+updateAt xs idx f =
+    if idx < 0 || idx >= length xs
+    then Nothing
+    else
+        let (before, after) = splitAt idx xs
+            element : after' = after
+            newElement = f element
+            xs' = before ++ newElement : after'
+        in Just (xs', newElement)
