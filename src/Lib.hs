@@ -3,6 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators   #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 module Lib
     ( startApp
@@ -47,15 +48,6 @@ data Item = Item
 instance ToJSON Item
 instance FromJSON Item
 
-data ItemUpdate = ItemUpdate
-    { titleUpdate :: Maybe ItemTitle
-    , descriptionUpdate :: Maybe ItemDescription
-    , priorityUpdate :: Maybe ItemPriority
-    , dueByUpdate :: Maybe ItemDueBy
-    } deriving (Generic, Show)
-instance ToJSON ItemUpdate
-instance FromJSON ItemUpdate
-
 data ToDoList = ToDoList [Item] deriving (Generic, Show)
 instance ToJSON ToDoList
 instance FromJSON ToDoList
@@ -73,7 +65,7 @@ notFoundError req = Data.Aeson.encode $ APIError (cs $ "Not found path: " <> raw
 -- $(deriveJSON defaultOptions ''Item)
 
 type API = "todos" :> Get '[JSON] ToDoList
-      :<|> "todos" :> ReqBody '[JSON] Item :> Post '[JSON] Item
+      :<|> "todos" :> ReqBody '[JSON] ItemNew :> Post '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> Get '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> ReqBody '[JSON] ItemUpdate :> Post '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> Delete '[JSON] NoContent
@@ -157,12 +149,54 @@ writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
 writeToDoList :: FilePath -> ToDoList -> Servant.Handler ()
 writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList  
 
-addItem :: FilePath -> Item -> Servant.Handler Item
-addItem dataPath item = do
-    ToDoList items <- readToDoList dataPath
-    let toDoList = ToDoList (item : items)
-    writeToDoList dataPath toDoList
-    return item
+-- validatePriority priority = case priority of
+--                 Low -> Right Low
+--                 Normal -> Right Normal
+--                 High -> Right High
+--                 _ -> Left $ "Invalid priority value " ++ priority
+
+validateDueBy :: String -> Either String LocalTime
+validateDueBy dueBy = 
+        case (parseDateTimeMaybe dueBy) of
+                (Just dateTime) -> Right dateTime
+                Nothing -> Left $ "Date/time string must be in " ++ dateTimeFormat ++ " format"
+        where         
+              parseDateTimeMaybe = parseTimeM False defaultTimeLocale dateTimeFormat
+              dateTimeFormat = "%Y/%m/%d %H:%M:%S"
+
+data ItemUpdate = ItemUpdate
+    { titleUpdate :: Maybe ItemTitle
+    , descriptionUpdate :: Maybe ItemDescription
+    , priorityUpdate :: Maybe ItemPriority
+    , dueByUpdate :: Maybe ItemDueBy
+    } deriving (Generic, Show)
+instance ToJSON ItemUpdate
+instance FromJSON ItemUpdate
+
+data ItemNew = ItemNew
+    { title :: ItemTitle
+    , description :: ItemDescription
+    , priority :: ItemPriority
+    , dueBy :: String
+    } deriving (Generic, Show)
+instance ToJSON ItemNew
+instance FromJSON ItemNew
+
+validateItem :: ItemNew -> Either String Item
+validateItem (ItemNew title description priority dueBy) = 
+    case validateDueBy dueBy of 
+        Left l -> Left l
+        Right dueByDate -> Right (Item title description priority (Just dueByDate))
+
+addItem :: FilePath -> ItemNew -> Servant.Handler Item
+addItem dataPath itemNew =
+    case validateItem itemNew of 
+        Left l -> throwError err400 { errBody = cs l } 
+        Right item -> do
+            ToDoList items <- readToDoList dataPath
+            let toDoList = ToDoList (item : items)
+            writeToDoList dataPath toDoList
+            return item
 
 viewItem :: FilePath -> ItemIndex -> Servant.Handler Item
 viewItem dataPath idx = do
