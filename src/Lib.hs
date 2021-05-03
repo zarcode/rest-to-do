@@ -35,6 +35,8 @@ type ItemDescription = String
 type ItemPriority = Maybe Priority
 type ItemDueBy = Maybe LocalTime
 
+type ItemUpdateDueBy = Maybe String
+
 data Priority = Low | Normal | High deriving (Generic, Show)
 instance ToJSON Priority
 instance FromJSON Priority
@@ -47,6 +49,24 @@ data Item = Item
     } deriving (Generic, Show)
 instance ToJSON Item
 instance FromJSON Item
+
+data ItemUpdate = ItemUpdate
+    { mbTitle :: Maybe ItemTitle
+    , mbDescription :: Maybe ItemDescription
+    , mbPriority :: Maybe ItemPriority
+    , mbDueBy :: Maybe ItemUpdateDueBy
+    } deriving (Generic, Show)
+instance ToJSON ItemUpdate
+instance FromJSON ItemUpdate
+
+data ItemNew = ItemNew
+    { title :: ItemTitle
+    , description :: ItemDescription
+    , priority :: ItemPriority
+    , dueBy :: String
+    } deriving (Generic, Show)
+instance ToJSON ItemNew
+instance FromJSON ItemNew
 
 data ToDoList = ToDoList [Item] deriving (Generic, Show)
 instance ToJSON ToDoList
@@ -120,11 +140,11 @@ server = todos
 
   where 
     todos = readToDoList defaultDataPath
-    todosAdd item = addItem defaultDataPath item
-    todo id = viewItem defaultDataPath id
+    todosAdd = addItem defaultDataPath
+    todo = viewItem defaultDataPath
     todoUpdate :: Int -> ItemUpdate -> Servant.Handler Item
-    todoUpdate id itemUpdate = updateItem defaultDataPath id itemUpdate
-    todoDelete id = removeItem defaultDataPath id
+    todoUpdate = updateItem defaultDataPath
+    todoDelete = removeItem defaultDataPath
 
 defaultDataPath :: FilePath
 defaultDataPath = "todos.yaml"
@@ -155,8 +175,8 @@ writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList
 --                 High -> Right High
 --                 _ -> Left $ "Invalid priority value " ++ priority
 
-validateDueBy :: String -> Either String LocalTime
-validateDueBy dueBy = 
+validateInputDateFormat :: String -> Either String LocalTime
+validateInputDateFormat dueBy = 
         case (parseDateTimeMaybe dueBy) of
                 (Just dateTime) -> Right dateTime
                 Nothing -> Left $ "Date/time string must be in " ++ dateTimeFormat ++ " format"
@@ -164,27 +184,11 @@ validateDueBy dueBy =
               parseDateTimeMaybe = parseTimeM False defaultTimeLocale dateTimeFormat
               dateTimeFormat = "%Y/%m/%d %H:%M:%S"
 
-data ItemUpdate = ItemUpdate
-    { titleUpdate :: Maybe ItemTitle
-    , descriptionUpdate :: Maybe ItemDescription
-    , priorityUpdate :: Maybe ItemPriority
-    , dueByUpdate :: Maybe ItemDueBy
-    } deriving (Generic, Show)
-instance ToJSON ItemUpdate
-instance FromJSON ItemUpdate
+-- validatedValueToItem :: Either a b -> Either a (Item b)
 
-data ItemNew = ItemNew
-    { title :: ItemTitle
-    , description :: ItemDescription
-    , priority :: ItemPriority
-    , dueBy :: String
-    } deriving (Generic, Show)
-instance ToJSON ItemNew
-instance FromJSON ItemNew
-
-validateItem :: ItemNew -> Either String Item
-validateItem (ItemNew title description priority dueBy) = 
-    case validateDueBy dueBy of 
+validateItemNew :: ItemNew -> Either String Item
+validateItemNew (ItemNew title description priority dueBy) = 
+    case validateInputDateFormat dueBy of 
         Left l -> Left l
         Right dueByDate -> Right (Item title description priority (Just dueByDate))
 
@@ -205,15 +209,36 @@ viewItem dataPath idx = do
     case mbItem of
         Just item -> return item
         Nothing -> throwError err404 { errBody = cantFindItemError }
-  
+ 
+-- updateDueBy :: Maybe ItemUpdateDueBy -> ItemDueBy -> ItemDueBy 
+-- updateDueBy (Just value) _ =
+--     case value of
+--         Just dueBy -> 
+--             case validateInputDateFormat dueBy of
+--                 Left message -> Nothing
+--                 Right dueByDate -> Just dueByDate
+--         Nothing -> Nothing
+-- updateDueBy Nothing value = value
+
+getUpdateDueBy :: Maybe ItemUpdateDueBy -> Servant.Handler (Maybe ItemDueBy)
+getUpdateDueBy (Just value) =
+    case value of
+                Just dueBy -> 
+                    case validateInputDateFormat dueBy of
+                        Left l -> throwError err400 { errBody = cs l }
+                        Right dueByDate -> return $ Just (Just dueByDate)
+                Nothing -> return $ Just Nothing
+
+
 updateItem :: FilePath -> ItemIndex -> ItemUpdate -> Servant.Handler Item
 updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = do
+    validatedMbDueBy <- getUpdateDueBy mbDueBy 
     ToDoList items <- readToDoList dataPath
     let update (Item title description priority dueBy) = Item
             (updateField mbTitle title)
             (updateField mbDescription description)
             (updateField mbPriority priority)
-            (updateField mbDueBy dueBy)
+            (updateField validatedMbDueBy dueBy)
         updateField (Just value) _ = value
         updateField Nothing value = value
         updateResult = updateAt items idx update
