@@ -169,32 +169,29 @@ writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
 writeToDoList :: FilePath -> ToDoList -> Servant.Handler ()
 writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList  
 
--- validatePriority priority = case priority of
---                 Low -> Right Low
---                 Normal -> Right Normal
---                 High -> Right High
---                 _ -> Left $ "Invalid priority value " ++ priority
+validateInputPriorityFormat :: Priority -> Either String Priority
+validateInputPriorityFormat priority = case priority of
+                Low -> Right Low
+                Normal -> Right Normal
+                High -> Right High
+                _ -> Left $ "Invalid priority value " ++ show priority
 
-validateInputDateFormat :: String -> Either String LocalTime
+validateInputDateFormat :: String -> Either String ItemDueBy
 validateInputDateFormat dueBy = 
         case (parseDateTimeMaybe dueBy) of
-                (Just dateTime) -> Right dateTime
+                (Just dateTime) -> Right (Just dateTime)
                 Nothing -> Left $ "Date/time string must be in " ++ dateTimeFormat ++ " format"
         where         
               parseDateTimeMaybe = parseTimeM False defaultTimeLocale dateTimeFormat
               dateTimeFormat = "%Y/%m/%d %H:%M:%S"
 
--- validatedValueToItem :: Either a b -> Either a (Item b)
-
 validateItemNew :: ItemNew -> Either String Item
-validateItemNew (ItemNew title description priority dueBy) = 
-    case validateInputDateFormat dueBy of 
-        Left l -> Left l
-        Right dueByDate -> Right (Item title description priority (Just dueByDate))
+validateItemNew (ItemNew title description priority dueBy) =
+    Item title description priority <$> validateInputDateFormat dueBy
 
 addItem :: FilePath -> ItemNew -> Servant.Handler Item
 addItem dataPath itemNew =
-    case validateItem itemNew of 
+    case validateItemNew itemNew of 
         Left l -> throwError err400 { errBody = cs l } 
         Right item -> do
             ToDoList items <- readToDoList dataPath
@@ -226,9 +223,14 @@ getUpdateDueBy (Just value) =
                 Just dueBy -> 
                     case validateInputDateFormat dueBy of
                         Left l -> throwError err400 { errBody = cs l }
-                        Right dueByDate -> return $ Just (Just dueByDate)
+                        Right dueByDate -> return $ Just dueByDate
                 Nothing -> return $ Just Nothing
 
+-- validateItemUpdate :: ItemUpdate -> Either String ItemUpdate
+-- validateItemUpdate (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = 
+--     case validateInputDateFormat dueBy of 
+--         Left l -> Left l
+--         Right dueByDate -> Right (ItemUpdate title description priority (Just dueByDate))
 
 updateItem :: FilePath -> ItemIndex -> ItemUpdate -> Servant.Handler Item
 updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = do
