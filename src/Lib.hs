@@ -62,7 +62,7 @@ instance FromJSON ItemUpdate
 data ItemNew = ItemNew
     { title :: ItemTitle
     , description :: ItemDescription
-    , priority :: ItemPriority
+    , priority :: Priority
     , dueBy :: String
     } deriving (Generic, Show)
 instance ToJSON ItemNew
@@ -78,11 +78,12 @@ data APIError = APIError
 instance ToJSON APIError
 instance FromJSON APIError
 
-fileCorruptedError = Data.Aeson.encode $ APIError "YAML file is corrupt"
-cantFindItemError = Data.Aeson.encode $ APIError "Invalid item index"
-notFoundError req = Data.Aeson.encode $ APIError (cs $ "Not found path: " <> rawPathInfo req)
+makeError code m = code { errBody = Data.Aeson.encode $ APIError m
+                        , errHeaders = [("Content-Type", "application/json")]
+                    }
+fileCorruptedError = "YAML file is corrupt"
+cantFindItemError = "Invalid item index"
 
--- $(deriveJSON defaultOptions ''Item)
 
 type API = "todos" :> Get '[JSON] ToDoList
       :<|> "todos" :> ReqBody '[JSON] ItemNew :> Post '[JSON] Item
@@ -114,8 +115,7 @@ customFormatter tr req err =
       }
 
 notFoundFormatter :: NotFoundErrorFormatter
-notFoundFormatter req =
-  err404 { errBody = notFoundError req }
+notFoundFormatter req = makeError err404 (cs $ "Not found path: " <> rawPathInfo req)
 
 customFormatters :: ErrorFormatters
 customFormatters = defaultErrorFormatters
@@ -161,7 +161,7 @@ readToDoList dataPath = do
   mbToDoList <- liftIO $ readYamlFile dataPath
   case mbToDoList of
     Just toDoList -> return toDoList
-    Nothing -> throwError err500 { errBody = fileCorruptedError }
+    Nothing -> throwError $ makeError err500 fileCorruptedError
 
 writeYamlFile :: FilePath -> ToDoList -> IO ()
 writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
@@ -169,30 +169,41 @@ writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
 writeToDoList :: FilePath -> ToDoList -> Servant.Handler ()
 writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList  
 
-validateInputPriorityFormat :: Priority -> Either String Priority
+validateInputPriorityFormat :: Priority -> Either String ItemPriority
 validateInputPriorityFormat priority = case priority of
-                Low -> Right Low
-                Normal -> Right Normal
-                High -> Right High
+                Low -> Right $ Just Low
+                Normal -> Right $ Just Normal
+                High -> Right $ Just High
                 _ -> Left $ "Invalid priority value " ++ show priority
 
 validateInputDateFormat :: String -> Either String ItemDueBy
 validateInputDateFormat dueBy = 
-        case (parseDateTimeMaybe dueBy) of
-                (Just dateTime) -> Right (Just dateTime)
+        case parseDateTimeMaybe dueBy of
+                Just dateTime -> Right (Just dateTime)
                 Nothing -> Left $ "Date/time string must be in " ++ dateTimeFormat ++ " format"
         where         
               parseDateTimeMaybe = parseTimeM False defaultTimeLocale dateTimeFormat
               dateTimeFormat = "%Y/%m/%d %H:%M:%S"
 
+collectError (Left e) = e
+collectError _        = ""   -- no errors
+
 validateItemNew :: ItemNew -> Either String Item
-validateItemNew (ItemNew title description priority dueBy) =
-    Item title description priority <$> validateInputDateFormat dueBy
+-- Shows just first error
+-- validateItemNew (ItemNew title description priority dueBy) =
+--     Item title description <$> validateInputPriorityFormat priority
+--                            <*> validateInputDateFormat dueBy
+-- Concats the errors
+validateItemNew (ItemNew title description priority dueBy) = 
+    case (validateInputPriorityFormat priority, validateInputDateFormat dueBy) of
+        (Right xpriority, Right xdueBy)   -> Right (Item title description xpriority xdueBy)
+        (expriority      , exdueBy      ) ->
+            Left (collectError expriority ++ " " ++ collectError exdueBy)
 
 addItem :: FilePath -> ItemNew -> Servant.Handler Item
 addItem dataPath itemNew =
     case validateItemNew itemNew of 
-        Left l -> throwError err400 { errBody = cs l } 
+        Left l -> throwError $ makeError err400 (cs l)
         Right item -> do
             ToDoList items <- readToDoList dataPath
             let toDoList = ToDoList (item : items)
@@ -205,24 +216,14 @@ viewItem dataPath idx = do
     let mbItem = items !! idx
     case mbItem of
         Just item -> return item
-        Nothing -> throwError err404 { errBody = cantFindItemError }
- 
--- updateDueBy :: Maybe ItemUpdateDueBy -> ItemDueBy -> ItemDueBy 
--- updateDueBy (Just value) _ =
---     case value of
---         Just dueBy -> 
---             case validateInputDateFormat dueBy of
---                 Left message -> Nothing
---                 Right dueByDate -> Just dueByDate
---         Nothing -> Nothing
--- updateDueBy Nothing value = value
+        Nothing -> throwError $ makeError err404 cantFindItemError
 
 getUpdateDueBy :: Maybe ItemUpdateDueBy -> Servant.Handler (Maybe ItemDueBy)
 getUpdateDueBy (Just value) =
     case value of
                 Just dueBy -> 
                     case validateInputDateFormat dueBy of
-                        Left l -> throwError err400 { errBody = cs l }
+                        Left l -> throwError $ makeError err400 (cs l)
                         Right dueByDate -> return $ Just dueByDate
                 Nothing -> return $ Just Nothing
 
@@ -245,7 +246,7 @@ updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = 
         updateField Nothing value = value
         updateResult = updateAt items idx update
     case updateResult of
-        Nothing -> throwError err404 { errBody = cantFindItemError }
+        Nothing -> throwError $ makeError err404 cantFindItemError
         Just (items', changedItem) -> do
             let toDoList = ToDoList items'
             writeToDoList dataPath toDoList
@@ -267,7 +268,7 @@ removeItem dataPath idx = do
     ToDoList items <- readToDoList dataPath
     let mbItems = items `removeAt` idx
     case mbItems of
-        Nothing -> throwError err404 { errBody = cantFindItemError }
+        Nothing -> throwError $ makeError err404 cantFindItemError
         Just items' -> do
             let toDoList = ToDoList items'
             writeToDoList dataPath toDoList
