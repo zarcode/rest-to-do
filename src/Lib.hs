@@ -221,11 +221,12 @@ viewItem dataPath idx = do
 getUpdateDueBy :: Maybe ItemUpdateDueBy -> Servant.Handler (Maybe ItemDueBy)
 getUpdateDueBy (Just value) =
     case value of
-                Just dueBy -> 
+                Just dueBy ->
                     case validateInputDateFormat dueBy of
                         Left l -> throwError $ makeError err400 (cs l)
                         Right dueByDate -> return $ Just dueByDate
-                Nothing -> return $ Just Nothing
+                Nothing -> return Nothing
+getUpdateDueBy Nothing = return Nothing 
 
 -- validateItemUpdate :: ItemUpdate -> Either String ItemUpdate
 -- validateItemUpdate (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = 
