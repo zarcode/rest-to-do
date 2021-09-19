@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 33ffdb9b72ef0f2a02f845b673d4803137b91517d42541357ee705077d902ad8
+-- hash: b981a4ddddde518c0908b7a948879f5659a5ee3cff30d031837dc4d04c1d9f4e
 
 name:           to-do-app
 version:        0.1.0.0
@@ -43,6 +43,7 @@ library
     , text
     , time
     , transformers
+    , validation
     , wai
     , warp
     , yaml
@@ -68,6 +69,7 @@ executable to-do-app-exe
     , time
     , to-do-app
     , transformers
+    , validation
     , wai
     , warp
     , yaml
@@ -97,6 +99,7 @@ test-suite to-do-app-test
     , time
     , to-do-app
     , transformers
+    , validation
     , wai
     , warp
     , yaml

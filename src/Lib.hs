@@ -12,10 +12,10 @@ module Lib
 
 import           Control.Exception
 import           Control.Monad.IO.Class
-import           Data.Aeson
+import           Data.Aeson hiding (Success)
 import           Data.Aeson.TH
 import qualified Data.ByteString.Char8 as BS
-import           Data.List.Safe ((!!))
+import           Data.List.Safe ((!!), intercalate)
 import qualified Data.Yaml as Yaml
 import           Data.Time
 -- import           Data.Text
@@ -28,6 +28,7 @@ import           Servant
 import           Servant.API.ContentTypes
 import           System.Directory
 import           System.IO.Error
+import           Data.Validation
 
 type ItemIndex = Int
 type ItemTitle = String
@@ -169,18 +170,18 @@ writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
 writeToDoList :: FilePath -> ToDoList -> Servant.Handler ()
 writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList  
 
-validateInputPriorityFormat :: Priority -> Either String ItemPriority
+validateInputPriorityFormat :: Priority -> Validation [String] ItemPriority
 validateInputPriorityFormat priority = case priority of
-                Low -> Right $ Just Low
-                Normal -> Right $ Just Normal
-                High -> Right $ Just High
-                _ -> Left $ "Invalid priority value " ++ show priority
+                Low -> Success $ Just Low
+                Normal -> Success $ Just Normal
+                High -> Success $ Just High
+                _ -> Failure $ ["Invalid priority value " ++ show priority]
 
-validateInputDateFormat :: String -> Either String ItemDueBy
+validateInputDateFormat :: String -> Validation [String] ItemDueBy
 validateInputDateFormat dueBy = 
         case parseDateTimeMaybe dueBy of
-                Just dateTime -> Right (Just dateTime)
-                Nothing -> Left $ "Date/time string must be in " ++ dateTimeFormat ++ " format"
+                Just dateTime -> Success (Just dateTime)
+                Nothing -> Failure $ ["Date/time string must be in " ++ dateTimeFormat ++ " format"]
         where         
               parseDateTimeMaybe = parseTimeM False defaultTimeLocale dateTimeFormat
               dateTimeFormat = "%Y/%m/%d %H:%M:%S"
@@ -188,23 +189,31 @@ validateInputDateFormat dueBy =
 collectError (Left e) = e
 collectError _        = ""   -- no errors
 
-validateItemNew :: ItemNew -> Either String Item
+
+-- validateItemNew :: ItemNew -> Either String Item
 -- Shows just first error
 -- validateItemNew (ItemNew title description priority dueBy) =
 --     Item title description <$> validateInputPriorityFormat priority
 --                            <*> validateInputDateFormat dueBy
 -- Concats the errors
+-- validateItemNew (ItemNew title description priority dueBy) = 
+--     case (validateInputPriorityFormat priority, validateInputDateFormat dueBy) of
+--         (Right xpriority, Right xdueBy)   -> Right (Item title description xpriority xdueBy)
+--         (expriority      , exdueBy      ) ->
+--             Left (collectError expriority ++ " " ++ collectError exdueBy)
+
+-- mergeErrorMessages = cs l
+mergeErrorMessages = intercalate ","
+
+validateItemNew :: ItemNew -> Validation [String] Item
 validateItemNew (ItemNew title description priority dueBy) = 
-    case (validateInputPriorityFormat priority, validateInputDateFormat dueBy) of
-        (Right xpriority, Right xdueBy)   -> Right (Item title description xpriority xdueBy)
-        (expriority      , exdueBy      ) ->
-            Left (collectError expriority ++ " " ++ collectError exdueBy)
+    Item title description <$> validateInputPriorityFormat priority <*> validateInputDateFormat dueBy
 
 addItem :: FilePath -> ItemNew -> Servant.Handler Item
 addItem dataPath itemNew =
     case validateItemNew itemNew of 
-        Left l -> throwError $ makeError err400 (cs l)
-        Right item -> do
+        Failure l -> throwError $ makeError err400 (mergeErrorMessages l)
+        Success item -> do
             ToDoList items <- readToDoList dataPath
             let toDoList = ToDoList (item : items)
             writeToDoList dataPath toDoList
@@ -223,8 +232,8 @@ getUpdateDueBy (Just value) =
     case value of
                 Just dueBy ->
                     case validateInputDateFormat dueBy of
-                        Left l -> throwError $ makeError err400 (cs l)
-                        Right dueByDate -> return $ Just dueByDate
+                        Failure l -> throwError $ makeError err400 (mergeErrorMessages l)
+                        Success dueByDate -> return $ Just dueByDate
                 Nothing -> return Nothing
 getUpdateDueBy Nothing = return Nothing 
 

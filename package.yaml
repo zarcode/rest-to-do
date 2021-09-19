@@ -30,6 +30,7 @@ dependencies:
 - text
 - time
 - transformers
+- validation
 - wai
 - warp
 - yaml
@@ -64,3 +65,4 @@ tests:
     - hspec-wai
     - hspec-wai-json
     - aeson
+    - validation
