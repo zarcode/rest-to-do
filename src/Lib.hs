@@ -186,22 +186,6 @@ validateInputDateFormat dueBy =
               parseDateTimeMaybe = parseTimeM False defaultTimeLocale dateTimeFormat
               dateTimeFormat = "%Y/%m/%d %H:%M:%S"
 
-collectError (Left e) = e
-collectError _        = ""   -- no errors
-
-
--- validateItemNew :: ItemNew -> Either String Item
--- Shows just first error
--- validateItemNew (ItemNew title description priority dueBy) =
---     Item title description <$> validateInputPriorityFormat priority
---                            <*> validateInputDateFormat dueBy
--- Concats the errors
--- validateItemNew (ItemNew title description priority dueBy) = 
---     case (validateInputPriorityFormat priority, validateInputDateFormat dueBy) of
---         (Right xpriority, Right xdueBy)   -> Right (Item title description xpriority xdueBy)
---         (expriority      , exdueBy      ) ->
---             Left (collectError expriority ++ " " ++ collectError exdueBy)
-
 -- mergeErrorMessages = cs l
 mergeErrorMessages = intercalate ","
 
