@@ -38,7 +38,7 @@ type ItemDueBy = Maybe LocalTime
 
 type ItemUpdateDueBy = Maybe String
 
-data Priority = Low | Normal | High | Add deriving (Generic, Show)
+data Priority = Low | Normal | High deriving (Generic, Show)
 instance ToJSON Priority
 instance FromJSON Priority
 
