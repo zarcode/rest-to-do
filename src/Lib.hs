@@ -38,7 +38,7 @@ type ItemDueBy = Maybe LocalTime
 
 type ItemUpdateDueBy = Maybe String
 
-data Priority = Low | Normal | High deriving (Generic, Show)
+data Priority = Low | Normal | High | Add deriving (Generic, Show)
 instance ToJSON Priority
 instance FromJSON Priority
 
@@ -85,6 +85,10 @@ makeError code m = code { errBody = Data.Aeson.encode $ APIError m
 fileCorruptedError = "YAML file is corrupt"
 cantFindItemError = "Invalid item index"
 
+data ValidationError = 
+    InvalidPriorityValue Priority
+    | InvalidDateFormat String
+    deriving Show
 
 type API = "todos" :> Get '[JSON] ToDoList
       :<|> "todos" :> ReqBody '[JSON] ItemNew :> Post '[JSON] Item
@@ -170,26 +174,29 @@ writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
 writeToDoList :: FilePath -> ToDoList -> Servant.Handler ()
 writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList  
 
-validateInputPriorityFormat :: Priority -> Validation [String] ItemPriority
+validateInputPriorityFormat :: Priority -> Validation [ValidationError] ItemPriority
 validateInputPriorityFormat priority = case priority of
                 Low -> Success $ Just Low
                 Normal -> Success $ Just Normal
                 High -> Success $ Just High
-                _ -> Failure $ ["Invalid priority value " ++ show priority]
+                _ -> Failure $ [InvalidPriorityValue priority]
 
-validateInputDateFormat :: String -> Validation [String] ItemDueBy
+validateInputDateFormat :: String -> Validation [ValidationError] ItemDueBy
 validateInputDateFormat dueBy = 
         case parseDateTimeMaybe dueBy of
                 Just dateTime -> Success (Just dateTime)
-                Nothing -> Failure $ ["Date/time string must be in " ++ dateTimeFormat ++ " format"]
+                Nothing -> Failure $ [InvalidDateFormat dateTimeFormat]
         where         
               parseDateTimeMaybe = parseTimeM False defaultTimeLocale dateTimeFormat
               dateTimeFormat = "%Y/%m/%d %H:%M:%S"
 
--- mergeErrorMessages = cs l
-mergeErrorMessages = intercalate ","
+mergeErrorMessages = intercalate "," . (map errorToString)
 
-validateItemNew :: ItemNew -> Validation [String] Item
+errorToString (InvalidPriorityValue priority) = "Invalid priority value " ++ show priority
+errorToString (InvalidDateFormat dateTimeFormat) = "Date/time string must be in " ++ dateTimeFormat ++ " format"
+
+
+validateItemNew :: ItemNew -> Validation [ValidationError] Item
 validateItemNew (ItemNew title description priority dueBy) = 
     Item title description <$> validateInputPriorityFormat priority <*> validateInputDateFormat dueBy
 
