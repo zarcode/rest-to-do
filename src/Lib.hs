@@ -7,7 +7,6 @@
 
 module Lib
     ( startApp
-    , app
     ) where
 
 import           Control.Exception
@@ -15,7 +14,7 @@ import           Control.Monad.IO.Class
 import           Data.Aeson hiding (Success)
 import           Data.Aeson.TH
 import qualified Data.ByteString.Char8 as BS
-import           Data.List.Safe ((!!), intercalate)
+import           Data.List.Safe ((!!))
 import qualified Data.Yaml as Yaml
 import           Data.Time
 -- import           Data.Text
@@ -30,26 +29,14 @@ import           System.Directory
 import           System.IO.Error
 import           Data.Validation
 
-type ItemIndex = Int
-type ItemTitle = String
-type ItemDescription = String
-type ItemPriority = Maybe Priority
-type ItemDueBy = Maybe LocalTime
+import           TodoType
+import           Todo
+import           TodosType
+import           Todos
+import           Utils
+import           Validation
 
 type ItemUpdateDueBy = Maybe String
-
-data Priority = Low | Normal | High deriving (Generic, Show)
-instance ToJSON Priority
-instance FromJSON Priority
-
-data Item = Item
-    { title :: ItemTitle
-    , description :: ItemDescription
-    , priority :: ItemPriority
-    , dueBy :: ItemDueBy
-    } deriving (Generic, Show)
-instance ToJSON Item
-instance FromJSON Item
 
 data ItemUpdate = ItemUpdate
     { mbTitle :: Maybe ItemTitle
@@ -60,29 +47,6 @@ data ItemUpdate = ItemUpdate
 instance ToJSON ItemUpdate
 instance FromJSON ItemUpdate
 
-data ItemNew = ItemNew
-    { title :: ItemTitle
-    , description :: ItemDescription
-    , priority :: Priority
-    , dueBy :: String
-    } deriving (Generic, Show)
-instance ToJSON ItemNew
-instance FromJSON ItemNew
-
-data ToDoList = ToDoList [Item] deriving (Generic, Show)
-instance ToJSON ToDoList
-instance FromJSON ToDoList
-
-data APIError = APIError
-    { message:: String
-    } deriving (Generic, Show)
-instance ToJSON APIError
-instance FromJSON APIError
-
-makeError code m = code { errBody = Data.Aeson.encode $ APIError m
-                        , errHeaders = [("Content-Type", "application/json")]
-                    }
-fileCorruptedError = "YAML file is corrupt"
 cantFindItemError = "Invalid item index"
 
 data ValidationError = 
@@ -90,11 +54,31 @@ data ValidationError =
     | InvalidDateFormat String
     deriving Show
 
-type API = "todos" :> Get '[JSON] ToDoList
-      :<|> "todos" :> ReqBody '[JSON] ItemNew :> Post '[JSON] Item
+type API = 
+      ToDosAPI
       :<|> "todo" :> Capture "id" Int :> Get '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> ReqBody '[JSON] ItemUpdate :> Post '[JSON] Item
       :<|> "todo" :> Capture "id" Int :> Delete '[JSON] NoContent
+
+app :: Application
+-- app = serve api server
+app = serveWithContext api (customFormatters :. EmptyContext) server
+
+api :: Proxy API
+api = Proxy
+
+server :: Server API
+server = 
+    todosServer
+     :<|> todo
+     :<|> todoUpdate
+     :<|> todoDelete
+
+  where 
+    todo = viewItem defaultDataPath
+    todoUpdate :: Int -> ItemUpdate -> Servant.Handler Item
+    todoUpdate = updateItem defaultDataPath
+    todoDelete = removeItem defaultDataPath
 
 startApp :: IO ()
 startApp = run 8080 app
@@ -128,87 +112,9 @@ customFormatters = defaultErrorFormatters
   , notFoundErrorFormatter = notFoundFormatter
   }
 
-app :: Application
--- app = serve api server
-app = serveWithContext api (customFormatters :. EmptyContext) server
-
-api :: Proxy API
-api = Proxy
-
-server :: Server API
-
-server = todos
-     :<|> todosAdd
-     :<|> todo
-     :<|> todoUpdate
-     :<|> todoDelete
-
-  where 
-    todos = readToDoList defaultDataPath
-    todosAdd = addItem defaultDataPath
-    todo = viewItem defaultDataPath
-    todoUpdate :: Int -> ItemUpdate -> Servant.Handler Item
-    todoUpdate = updateItem defaultDataPath
-    todoDelete = removeItem defaultDataPath
-
 defaultDataPath :: FilePath
 defaultDataPath = "todos.yaml"
 -- defaultDataPath = "~/.users.yaml"
-
-readYamlFile :: FilePath -> IO (Maybe ToDoList)
-readYamlFile dataPath = catchJust
-            (\e -> if isDoesNotExistError e then Just () else Nothing)
-            (BS.readFile dataPath >>= return . Yaml.decode)
-            (\_ -> return $ Just (ToDoList []))
-
-readToDoList :: FilePath -> Servant.Handler ToDoList 
-readToDoList dataPath = do
-  mbToDoList <- liftIO $ readYamlFile dataPath
-  case mbToDoList of
-    Just toDoList -> return toDoList
-    Nothing -> throwError $ makeError err500 fileCorruptedError
-
-writeYamlFile :: FilePath -> ToDoList -> IO ()
-writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
-
-writeToDoList :: FilePath -> ToDoList -> Servant.Handler ()
-writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList  
-
-validateInputPriorityFormat :: Priority -> Validation [ValidationError] ItemPriority
-validateInputPriorityFormat priority = case priority of
-                Low -> Success $ Just Low
-                Normal -> Success $ Just Normal
-                High -> Success $ Just High
-                _ -> Failure $ [InvalidPriorityValue priority]
-
-validateInputDateFormat :: String -> Validation [ValidationError] ItemDueBy
-validateInputDateFormat dueBy = 
-        case parseDateTimeMaybe dueBy of
-                Just dateTime -> Success (Just dateTime)
-                Nothing -> Failure $ [InvalidDateFormat dateTimeFormat]
-        where         
-              parseDateTimeMaybe = parseTimeM False defaultTimeLocale dateTimeFormat
-              dateTimeFormat = "%Y/%m/%d %H:%M:%S"
-
-mergeErrorMessages = intercalate "," . (map errorToString)
-
-errorToString (InvalidPriorityValue priority) = "Invalid priority value " ++ show priority
-errorToString (InvalidDateFormat dateTimeFormat) = "Date/time string must be in " ++ dateTimeFormat ++ " format"
-
-
-validateItemNew :: ItemNew -> Validation [ValidationError] Item
-validateItemNew (ItemNew title description priority dueBy) = 
-    Item title description <$> validateInputPriorityFormat priority <*> validateInputDateFormat dueBy
-
-addItem :: FilePath -> ItemNew -> Servant.Handler Item
-addItem dataPath itemNew =
-    case validateItemNew itemNew of 
-        Failure l -> throwError $ makeError err400 (mergeErrorMessages l)
-        Success item -> do
-            ToDoList items <- readToDoList dataPath
-            let toDoList = ToDoList (item : items)
-            writeToDoList dataPath toDoList
-            return item
 
 viewItem :: FilePath -> ItemIndex -> Servant.Handler Item
 viewItem dataPath idx = do
@@ -227,12 +133,6 @@ getUpdateDueBy (Just value) =
                         Success dueByDate -> return $ Just dueByDate
                 Nothing -> return Nothing
 getUpdateDueBy Nothing = return Nothing 
-
--- validateItemUpdate :: ItemUpdate -> Either String ItemUpdate
--- validateItemUpdate (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = 
---     case validateInputDateFormat dueBy of 
---         Left l -> Left l
---         Right dueByDate -> Right (ItemUpdate title description priority (Just dueByDate))
 
 updateItem :: FilePath -> ItemIndex -> ItemUpdate -> Servant.Handler Item
 updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = do
