@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Utils
+module Utils.TodoUtils
     ( 
         readYamlFile,
         writeYamlFile,
@@ -9,7 +9,6 @@ module Utils
         APIError (APIError)
     ) where
 
-import           TodosType
 import           Control.Exception
 import           Data.Aeson hiding (Success)
 import qualified Data.ByteString.Char8 as BS
@@ -17,6 +16,8 @@ import qualified Data.Yaml as Yaml
 import           GHC.Generics
 import           System.IO.Error
 import           Servant
+
+import           Models.Todos
 
 data APIError = APIError
     { message:: String

@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators   #-}
 
-module TodosType
+module Models.Todos
     (
         ItemNew (ItemNew)
         , ToDoList (ToDoList)
@@ -11,7 +11,8 @@ module TodosType
 import Data.Aeson hiding (Success)
 import GHC.Generics
 import Servant
-import TodoType (Item, ItemDescription, ItemTitle, Priority)
+
+import Models.Todo (Item, ItemDescription, ItemTitle, Priority)
 
 data ToDoList = ToDoList [Item] deriving (Generic, Show)
 instance ToJSON ToDoList

@@ -5,7 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 
-module Validation
+module Utils.TodoValidation
     ( validateInputPriorityFormat
     , validateInputDateFormat
     , mergeErrorMessages
@@ -16,8 +16,8 @@ import Data.List.Safe ((!!), intercalate)
 import Data.Time
 import Data.Validation
 
-import TodoType
-import TodosType
+import Models.Todo
+import Models.Todos
 
 data ValidationError = 
     InvalidPriorityValue Priority

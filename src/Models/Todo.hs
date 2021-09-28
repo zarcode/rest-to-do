@@ -1,13 +1,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module TodoType
+module Models.Todo
     ( 
        Item (Item)
        , ItemDueBy
+       , ItemUpdateDueBy
        , ItemIndex
        , ItemTitle 
        , ItemDescription
        , ItemPriority
+       , ItemUpdate (ItemUpdate)
        , Priority (..)
     ) where
 
@@ -33,3 +35,14 @@ data Item = Item
     } deriving (Generic, Show)
 instance ToJSON Item
 instance FromJSON Item
+
+type ItemUpdateDueBy = Maybe String
+
+data ItemUpdate = ItemUpdate
+    { mbTitle :: Maybe ItemTitle
+    , mbDescription :: Maybe ItemDescription
+    , mbPriority :: Maybe ItemPriority
+    , mbDueBy :: Maybe ItemUpdateDueBy
+    } deriving (Generic, Show)
+instance ToJSON ItemUpdate
+instance FromJSON ItemUpdate
