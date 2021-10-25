@@ -25,20 +25,20 @@ import Utils.TodoValidation (mergeErrorMessages, validateInputDateFormat)
 
 cantFindItemError = "Invalid item index"
 
-defaultDataPath :: FilePath
-defaultDataPath = "todos.yaml"
+dbfile :: FilePath
+dbfile = "todos.yaml"
 
 type ToDoAPI = "todo" :> Capture "id" Int :> Get '[JSON] Item
                 :<|> "todo" :> Capture "id" Int :> ReqBody '[JSON] ItemUpdate :> Post '[JSON] Item
                 :<|> "todo" :> Capture "id" Int :> Delete '[JSON] NoContent 
     
-todoServer :: Server ToDoAPI
-todoServer = 
+todoServer :: FilePath -> Server ToDoAPI
+todoServer dbfile = 
         todo
         :<|> todoUpdate
         :<|> todoDelete
     where 
-        todo = viewItem defaultDataPath
+        todo = viewItem dbfile
         todoUpdate :: Int -> ItemUpdate -> Servant.Handler Item
-        todoUpdate = updateItem defaultDataPath
-        todoDelete = removeItem defaultDataPath
+        todoUpdate = updateItem dbfile
+        todoDelete = removeItem dbfile

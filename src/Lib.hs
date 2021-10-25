@@ -33,20 +33,25 @@ type API =
       ToDosAPI
       :<|> ToDoAPI
 
-app :: Application
--- app = serve api server
-app = serveWithContext api (customFormatters :. EmptyContext) server
+app :: FilePath -> Application
+app dbfile = serveWithContext api (customFormatters :. EmptyContext) $ server dbfile
 
 api :: Proxy API
 api = Proxy
 
-server :: Server API
-server = 
-    todosServer
-    :<|> todoServer
+server :: FilePath -> Server API
+server dbfile = 
+    (todosServer dbfile)
+    :<|> (todoServer dbfile)
+
+runApp :: FilePath -> IO ()
+runApp dbfile = run 8080 (app dbfile)
 
 startApp :: IO ()
-startApp = run 8080 app
+startApp = do
+  -- TODO: we could read file path from config file
+  let dbfile = "todos.yaml"
+  runApp dbfile
 
 customFormatter :: ErrorFormatter
 customFormatter tr req err =

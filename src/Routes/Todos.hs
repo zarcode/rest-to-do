@@ -20,18 +20,15 @@ import Models.Todo (Item, ItemDescription, ItemTitle, Priority)
 import Utils.TodoUtils (readYamlFile, writeYamlFile, makeError)
 import Utils.TodoValidation (mergeErrorMessages, validateItemNew)
 
-defaultDataPath :: FilePath
-defaultDataPath = "todos.yaml"
-
 fileCorruptedError = "YAML file is corrupt"
 
 type ToDosAPI = "todos" :> Get '[JSON] ToDoList
                 :<|> "todos" :> ReqBody '[JSON] ItemNew :> Post '[JSON] Item
 
-todosServer :: Server ToDosAPI
-todosServer = 
+todosServer :: FilePath -> Server ToDosAPI
+todosServer dbfile = 
         todos
         :<|> todosAdd
     where 
-        todos = readToDoList defaultDataPath
-        todosAdd = addItem defaultDataPath
+        todos = readToDoList dbfile
+        todosAdd = addItem dbfile
