@@ -26,9 +26,6 @@ import Utils.TodoValidation (mergeErrorMessages, validateInputDateFormat)
 
 cantFindItemError = "Invalid item index"
 
-defaultDataPath :: FilePath
-defaultDataPath = "todos.yaml"
-
 viewItem :: FilePath -> ItemIndex -> Servant.Handler Item
 viewItem dataPath idx = do
     ToDoList items <- readToDoList dataPath

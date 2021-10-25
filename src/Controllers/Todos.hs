@@ -20,9 +20,6 @@ import Models.Todo (Item, ItemDescription, ItemTitle, Priority)
 import Utils.TodoUtils (readYamlFile, writeYamlFile, makeError)
 import Utils.TodoValidation (mergeErrorMessages, validateItemNew)
 
-defaultDataPath :: FilePath
-defaultDataPath = "todos.yaml"
-
 fileCorruptedError = "YAML file is corrupt"
 
 readToDoList :: FilePath -> Servant.Handler ToDoList 
