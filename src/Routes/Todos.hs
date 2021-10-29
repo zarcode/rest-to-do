@@ -17,7 +17,6 @@ import Servant
 import Controllers.Todos
 import Models.Todos
 import Models.Todo (Item, ItemDescription, ItemTitle, Priority)
-import Utils.TodoUtils (readYamlFile, writeYamlFile, makeError)
 import Utils.TodoValidation (mergeErrorMessages, validateItemNew)
 
 fileCorruptedError = "YAML file is corrupt"

@@ -15,11 +15,13 @@ import Data.Validation
 import GHC.Generics
 import Servant
 
-import Models.Todos
+import Models.Todos ( ItemNew, ToDoList(..) )
 import Models.Todo (Item, ItemDescription, ItemTitle, Priority)
-import Utils.TodoUtils (readYamlFile, writeYamlFile, makeError)
+import Utils.FileDBUtils (readYamlFile, writeYamlFile)
+import Utils.TodoUtils (makeError)
 import Utils.TodoValidation (mergeErrorMessages, validateItemNew)
 
+fileCorruptedError :: [Char]
 fileCorruptedError = "YAML file is corrupt"
 
 readToDoList :: FilePath -> Servant.Handler ToDoList 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6f4652dd3fb50e5fe001b7a4fa52c3fbc43f7b760df344035f2931965e00cd6b
+-- hash: c904549218d2aa5be240e39ef6f87210fe6334fa3308313b949645ffdeed86e5
 
 name:           to-do-app
 version:        0.1.0.0
@@ -33,6 +33,7 @@ library
       Models.Todos
       Routes.Todo
       Routes.Todos
+      Utils.FileDBUtils
       Utils.TodoUtils
       Utils.TodoValidation
   other-modules:
