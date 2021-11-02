@@ -27,6 +27,7 @@ dependencies:
 - servant
 - servant-server
 - string-conversions
+- sqlite-simple
 - text
 - time
 - transformers

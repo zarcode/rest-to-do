@@ -14,7 +14,7 @@ import Servant
 
 import Models.Todo (Item, ItemDescription, ItemTitle, Priority)
 
-data ToDoList = ToDoList [Item] deriving (Generic, Show)
+newtype ToDoList = ToDoList [Item] deriving (Generic, Show)
 instance ToJSON ToDoList
 instance FromJSON ToDoList
 

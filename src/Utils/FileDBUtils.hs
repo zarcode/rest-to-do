@@ -17,12 +17,6 @@ import           Servant
 
 import           Models.Todos
 
-data APIError = APIError
-    { message:: String
-    } deriving (Generic, Show)
-instance ToJSON APIError
-instance FromJSON APIError
-
 readYamlFile :: FilePath -> IO (Maybe ToDoList)
 readYamlFile dataPath = catchJust
             (\e -> if isDoesNotExistError e then Just () else Nothing)
@@ -31,7 +25,3 @@ readYamlFile dataPath = catchJust
 
 writeYamlFile :: FilePath -> ToDoList -> IO ()
 writeYamlFile dataPath toDoList = BS.writeFile dataPath (Yaml.encode toDoList)
-
-makeError code m = code { errBody = Data.Aeson.encode $ APIError m
-                        , errHeaders = [("Content-Type", "application/json")]
-                    }

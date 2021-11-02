@@ -10,6 +10,7 @@ module Lib
 import           Data.Aeson hiding (Success)
 import           Data.Aeson.TH
 import           Data.String.Conversions (cs)
+import           Database.SQLite.Simple ( execute_, withConnection )
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           Prelude hiding ((!!))
@@ -33,6 +34,11 @@ type API =
       ToDosAPI
       :<|> ToDoAPI
 
+initDB :: FilePath -> IO ()
+initDB dbfile = withConnection dbfile $ \conn ->
+  execute_ conn
+    "CREATE TABLE IF NOT EXISTS todos (title TEXT, description TEXT, priority TEXT, dueBy TEXT)"
+
 app :: FilePath -> Application
 app dbfile = serveWithContext api (customFormatters :. EmptyContext) $ server dbfile
 
@@ -50,8 +56,19 @@ runApp dbfile = run 8080 (app dbfile)
 startApp :: IO ()
 startApp = do
   -- TODO: we could read file path from config file
-  let dbfile = "todos.yaml"
+  -- let dbfile = "todos.yaml"
+  -- initDB dbfile
+  -- mgr <- newManager defaultManagerSettings
+  -- runApp dbfile
+  let dbfile = "todos.db"
+  initDB dbfile
   runApp dbfile
+  -- bracket (forkIO $ runApp dbfile) killThread $ \_ -> do
+  --   ms <- flip runClientM (mkClientEnv mgr (BaseUrl Http "localhost" 8080 "")) $ do
+  --     postMsg "hello"
+  --     postMsg "world"
+  --     getMsgs
+  --   print ms
 
 customFormatter :: ErrorFormatter
 customFormatter tr req err =

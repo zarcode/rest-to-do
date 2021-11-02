@@ -13,7 +13,7 @@ module Utils.TodoValidation
     ) where
 
 import Data.List.Safe ((!!), intercalate)
-import Data.Time
+import Data.Time ( defaultTimeLocale, parseTimeM )
 import Data.Validation
 
 import Models.Todo

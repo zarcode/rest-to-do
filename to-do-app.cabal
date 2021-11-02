@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c904549218d2aa5be240e39ef6f87210fe6334fa3308313b949645ffdeed86e5
+-- hash: 3a264a92ca35430f3d2b659db2847b65061b3db0823e161ffac86e245699a0e8
 
 name:           to-do-app
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       Routes.Todo
       Routes.Todos
       Utils.FileDBUtils
+      Utils.SQLiteDBUtils
       Utils.TodoUtils
       Utils.TodoValidation
   other-modules:
@@ -48,6 +49,7 @@ library
     , listsafe
     , servant
     , servant-server
+    , sqlite-simple
     , string-conversions
     , text
     , time
@@ -73,6 +75,7 @@ executable to-do-app-exe
     , listsafe
     , servant
     , servant-server
+    , sqlite-simple
     , string-conversions
     , text
     , time
@@ -103,6 +106,7 @@ test-suite to-do-app-test
     , listsafe
     , servant
     , servant-server
+    , sqlite-simple
     , string-conversions
     , text
     , time
