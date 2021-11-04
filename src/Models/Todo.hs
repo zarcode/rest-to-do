@@ -63,16 +63,17 @@ type ItemPriority = Maybe Priority
 type ItemDueBy = Maybe LocalTime
 
 data Item = Item
-    { title :: ItemTitle
+    { id :: ItemIndex
+    , title :: ItemTitle
     , description :: ItemDescription
     , priority :: ItemPriority
     , dueBy :: ItemDueBy
     } deriving (Generic, Show)
 instance ToJSON Item
 instance FromJSON Item
-instance FromRow Item where fromRow = Item <$> field <*> field <*> field <*> field 
+instance FromRow Item where fromRow = Item <$> field <*> field <*> field <*> field <*> field 
 instance ToRow Item where
-  toRow (Item title description priority dueBy) = toRow (title, description, priority, dueBy)
+  toRow (Item _id title description priority dueBy) = toRow (title, description, priority, dueBy)
 
 
 

@@ -48,4 +48,4 @@ errorToString (InvalidDateFormat dateTimeFormat) = "Date/time string must be in 
 
 validateItemNew :: ItemNew -> Validation [ValidationError] Item
 validateItemNew (ItemNew title description priority dueBy) = 
-    Item title description <$> validateInputPriorityFormat priority <*> validateInputDateFormat dueBy
+    Item 0 title description <$> validateInputPriorityFormat priority <*> validateInputDateFormat dueBy

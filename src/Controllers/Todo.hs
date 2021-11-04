@@ -21,6 +21,7 @@ import Controllers.Todos
 import Routes.Todos
 import Models.Todos
 import Models.Todo
+import Utils.SQLiteDBUtils (deleteItemFromDb, getItemFromDb, updateItemInDb)
 import Utils.TodoUtils (makeError)
 import Utils.TodoValidation (mergeErrorMessages, validateInputDateFormat)
 
@@ -47,50 +48,28 @@ getUpdateDueBy Nothing = return Nothing
 updateItem :: FilePath -> ItemIndex -> ItemUpdate -> Servant.Handler Item
 updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = do
     validatedMbDueBy <- getUpdateDueBy mbDueBy 
-    ToDoList items <- readToDoList dataPath
-    let update (Item title description priority dueBy) = Item
-            (updateField mbTitle title)
-            (updateField mbDescription description)
-            (updateField mbPriority priority)
-            (updateField validatedMbDueBy dueBy)
-        updateField (Just value) _ = value
-        updateField Nothing value = value
-        updateResult = updateAt items idx update
-    case updateResult of
-        Nothing -> throwError $ makeError err404 cantFindItemError
-        Just (items', changedItem) -> do
-            let toDoList = ToDoList items'
-            writeToDoList dataPath toDoList
-            return changedItem
-
-updateAt :: [a] -> Int -> (a -> a) -> Maybe ([a], a)
-updateAt xs idx f =
-    if idx < 0 || idx >= length xs
-    then Nothing
-    else
-        let (before, after) = splitAt idx xs
-            element : after' = after
-            newElement = f element
-            xs' = before ++ newElement : after'
-        in Just (xs', newElement)
+    eithItem <- liftIO $ getItemFromDb dataPath idx
+    case eithItem of
+        Left e          -> throwError $ makeError err500 e
+        Right ([])      -> throwError $ makeError err500 ("Item with " ++ (show idx) ++ " is not found.")
+        Right (item:xs) -> do
+            let update (Item id title description priority dueBy) = Item
+                    id
+                    (updateField mbTitle title)
+                    (updateField mbDescription description)
+                    (updateField mbPriority priority)
+                    (updateField validatedMbDueBy dueBy)
+                updateField (Just value) _ = value
+                updateField Nothing value = value
+                updateResult = update item
+            result <- liftIO $ updateItemInDb dataPath updateResult 
+            case result of
+                Right _ -> return updateResult
+                Left e -> throwError $ makeError err500 e
 
 removeItem :: FilePath -> ItemIndex -> Servant.Handler NoContent 
 removeItem dataPath idx = do
-    ToDoList items <- readToDoList dataPath
-    let mbItems = items `removeAt` idx
-    case mbItems of
-        Nothing -> throwError $ makeError err404 cantFindItemError
-        Just items' -> do
-            let toDoList = ToDoList items'
-            writeToDoList dataPath toDoList
-            return NoContent
-
-removeAt :: [a] -> Int -> Maybe [a]
-removeAt xs idx =
-    if idx < 0 || idx >= length xs
-    then Nothing
-    else
-        let (before, after) = splitAt idx xs
-            _ : after' = after
-            xs' = before ++ after'
-        in Just xs'
+    result <- liftIO $ deleteItemFromDb dataPath idx
+    case result of
+        Right _ -> return NoContent
+        Left e -> throwError $ makeError err500 e

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3a264a92ca35430f3d2b659db2847b65061b3db0823e161ffac86e245699a0e8
+-- hash: 78ff5eca0a141d72b343304dc66b153f7717de5c8d4ec16ffc72f88b361f29d1
 
 name:           to-do-app
 version:        0.1.0.0
@@ -28,6 +28,9 @@ library
   exposed-modules:
       Controllers.Todo
       Controllers.Todos
+      Database.SQLite.SimpleErrors
+      Database.SQLite.SimpleErrors.Parser
+      Database.SQLite.SimpleErrors.Types
       Lib
       Models.Todo
       Models.Todos
@@ -47,6 +50,7 @@ library
     , bytestring
     , directory
     , listsafe
+    , parsec
     , servant
     , servant-server
     , sqlite-simple
@@ -73,6 +77,7 @@ executable to-do-app-exe
     , bytestring
     , directory
     , listsafe
+    , parsec
     , servant
     , servant-server
     , sqlite-simple
@@ -104,6 +109,7 @@ test-suite to-do-app-test
     , hspec-wai
     , hspec-wai-json
     , listsafe
+    , parsec
     , servant
     , servant-server
     , sqlite-simple

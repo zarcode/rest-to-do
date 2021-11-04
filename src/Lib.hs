@@ -37,7 +37,7 @@ type API =
 initDB :: FilePath -> IO ()
 initDB dbfile = withConnection dbfile $ \conn ->
   execute_ conn
-    "CREATE TABLE IF NOT EXISTS todos (title TEXT, description TEXT, priority TEXT, dueBy TEXT)"
+    "CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, description TEXT, priority TEXT, dueBy TEXT)"
 
 app :: FilePath -> Application
 app dbfile = serveWithContext api (customFormatters :. EmptyContext) $ server dbfile

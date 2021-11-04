@@ -16,21 +16,18 @@ import GHC.Generics
 import Servant
 
 import Models.Todos ( ItemNew, ToDoList(..) )
-import Models.Todo (Item, ItemDescription, ItemTitle, Priority)
+import Models.Todo (Item, ItemDescription, ItemTitle, Priority, ItemIndex)
 import Utils.FileDBUtils (readYamlFile, writeYamlFile)
 import Utils.SQLiteDBUtils (readToDoListFromDb, addItemToDb)
 import Utils.TodoUtils (makeError)
 import Utils.TodoValidation (mergeErrorMessages, validateItemNew)
 
-fileCorruptedError :: [Char]
-fileCorruptedError = "YAML file is corrupt"
-
 readToDoList :: FilePath -> Servant.Handler ToDoList 
 readToDoList dataPath = do
-  mbToDoList <- liftIO $ readToDoListFromDb dataPath
-  case mbToDoList of
-    Just toDoList -> return toDoList
-    Nothing -> throwError $ makeError err500 fileCorruptedError
+  eitherToDoList <- liftIO $ readToDoListFromDb dataPath
+  case eitherToDoList of
+    Right toDoList -> return toDoList
+    Left e -> throwError $ makeError err500 e
 
 writeToDoList :: FilePath -> ToDoList -> Servant.Handler ()
 writeToDoList dataPath toDoList = liftIO $ writeYamlFile dataPath toDoList 

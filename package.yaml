@@ -24,6 +24,7 @@ dependencies:
 - bytestring
 - directory
 - listsafe
+- parsec
 - servant
 - servant-server
 - string-conversions
