@@ -37,9 +37,13 @@ getItemFromDb dataPath idx = withConnection dataPath $ \conn -> do
                                         Left e  -> return $ Left (show e)
                                         Right r -> return $ Right r
 
+updateData (Item id title description priority dueBy) =
+    -- ( zipWith (\x y -> (T.pack (':':x)) := (T.pack y) ) ["id", "title", "description", "priority", "dueBy"] [id, title, description, show priority, show dueBy] )
+    [":title" := title, ":description" := description, ":priority" := priority, ":dueBy" := dueBy, ":id" := id]
+
 updateItemInDb :: FilePath -> Item -> IO (Either String ())
-updateItemInDb dataPath (Item id title description priority dueBy) = withConnection dataPath $ \conn -> do
-                                    res <- runDBAction $ ( executeNamed conn "UPDATE todos SET title = :title, description = :description, priority = :priority, dueBy = :dueBy WHERE id = :id" [":title" := title, ":description" := description, ":priority" := priority, ":dueBy" := dueBy, ":id" := id] )
+updateItemInDb dataPath item = withConnection dataPath $ \conn -> do
+                                    res <- runDBAction $ ( executeNamed conn "UPDATE todos SET title = :title, description = :description, priority = :priority, dueBy = :dueBy WHERE id = :id" $ updateData item )
                                     case res of
                                         Left e  -> return $ Left (show e)
                                         Right r -> return $ Right r
