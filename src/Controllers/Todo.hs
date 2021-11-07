@@ -29,11 +29,11 @@ cantFindItemError = "Invalid item index"
 
 viewItem :: FilePath -> ItemIndex -> Servant.Handler Item
 viewItem dataPath idx = do
-    ToDoList items <- readToDoList dataPath
-    let mbItem = items !! idx
-    case mbItem of
-        Just item -> return item
-        Nothing -> throwError $ makeError err404 cantFindItemError
+    eithItem <- liftIO $ getItemFromDb dataPath idx
+    case eithItem of
+        Left e          -> throwError $ makeError err500 e
+        Right ([])      -> throwError $ makeError err500 ("Item with " ++ (show idx) ++ " is not found.")
+        Right (item:xs) -> return item
 
 getUpdateDueBy :: Maybe ItemUpdateDueBy -> Servant.Handler (Maybe ItemDueBy)
 getUpdateDueBy (Just value) =
