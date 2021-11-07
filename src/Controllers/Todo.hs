@@ -67,6 +67,24 @@ updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = 
                 Right _ -> return updateResult
                 Left e -> throwError $ makeError err500 e
 
+-- updateItem :: FilePath -> ItemIndex -> ItemUpdate -> Servant.Handler Item
+-- updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = do
+--     validatedMbDueBy <- getUpdateDueBy mbDueBy
+--     let updateResult = 
+--         [
+--             ("title", pack (updateField mbTitle)), 
+--             ("description", pack (updateField mbDescription) ), 
+--             ("priority", pack (updateField mbPriority)), 
+--             ("dueBy", pack (updateField validatedMbDueBy)), 
+--             ("id", pack id)
+--         ]
+--         updateField (Just value) = value
+--         updateField Nothing = Nothing
+--     result <- liftIO $ updateItemInDb dataPath updateResult 
+--     case result of
+--         Right _ -> return result
+--         Left e -> throwError $ makeError err500 e
+
 removeItem :: FilePath -> ItemIndex -> Servant.Handler NoContent 
 removeItem dataPath idx = do
     result <- liftIO $ deleteItemFromDb dataPath idx
