@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 module Utils.SQLiteDBUtils
     ( 
@@ -13,9 +14,11 @@ module Utils.SQLiteDBUtils
 import           Control.Exception
 import           Data.Aeson hiding (Success)
 import qualified Data.ByteString.Char8 as BS
+import           Data.Dynamic
 import           Database.SQLite.SimpleErrors
 import           Database.SQLite.SimpleErrors.Types
-import           Database.SQLite.Simple ( execute, executeNamed, queryNamed, query_, withConnection, NamedParam( (:=) ), Only(Only) )
+import           Database.SQLite.Simple ( execute, executeNamed, queryNamed, query_, withConnection, NamedParam( (:=) ), Only(Only), SQLData(SQLText) )
+import           Database.SQLite.Simple.ToField ( ToField(..) )
 import qualified Data.Text as T
 import qualified Data.Yaml as Yaml
 import           GHC.Generics
@@ -37,8 +40,20 @@ getItemFromDb dataPath idx = withConnection dataPath $ \conn -> do
                                         Left e  -> return $ Left (show e)
                                         Right r -> return $ Right r
 
-updateData (Item id title description priority dueBy) =
-    -- ( zipWith (\x y -> (T.pack (':':x)) := (T.pack y) ) ["id", "title", "description", "priority", "dueBy"] [id, title, description, show priority, show dueBy] )
+-- data Showable = forall a . Show a => MkShowable a
+-- instance Show Showable
+--   where
+--   showsPrec p (MkShowable a) = showsPrec p a
+  
+-- instance ToField Showable where
+--   toField = SQLText . T.pack . show
+
+-- pack :: Show a => a -> Showable
+-- pack = MkShowable
+
+
+updateData (Item id title description (Just priority) (Just dueBy)) =
+    -- ( zipWith (\x y -> (:=) (T.pack (':':x)) y ) ["title", "description", "priority", "dueBy", "id"] ([ pack title, pack description, pack priority, pack dueBy, pack id] :: [Showable]) )
     [":title" := title, ":description" := description, ":priority" := priority, ":dueBy" := dueBy, ":id" := id]
 
 updateItemInDb :: FilePath -> Item -> IO (Either String ())
