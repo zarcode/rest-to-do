@@ -13,6 +13,7 @@ import Control.Monad.IO.Class
 import Data.Aeson hiding (Success)
 import Data.List.Safe ((!!))
 import Data.Validation
+import Data.Traversable (traverse)
 import GHC.Generics
 import Prelude hiding ((!!))
 import Servant
@@ -36,14 +37,11 @@ viewItem dataPath idx = do
         Right (item:xs) -> return item
 
 getUpdateDueBy :: Maybe ItemUpdateDueBy -> Servant.Handler (Maybe ItemDueBy)
-getUpdateDueBy (Just value) =
-    case value of
-                Just dueBy ->
-                    case validateInputDateFormat dueBy of
-                        Failure l -> throwError $ makeError err400 (mergeErrorMessages l)
-                        Success dueByDate -> return $ Just dueByDate
-                Nothing -> return Nothing
-getUpdateDueBy Nothing = return Nothing 
+getUpdateDueBy (Just mvalue) = 
+    case (traverse validateInputDateFormat mvalue) of
+        Failure l -> throwError $ makeError err400 (mergeErrorMessages l)
+        Success dueByDate -> return dueByDate
+getUpdateDueBy Nothing = return Nothing
 
 updateItem :: FilePath -> ItemIndex -> ItemUpdate -> Servant.Handler Item
 updateItem dataPath idx (ItemUpdate mbTitle mbDescription mbPriority mbDueBy) = do
