@@ -8,9 +8,9 @@ cabal-version: 1.12
 
 name:           to-do-app
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/to-do-app#readme>
-homepage:       https://github.com/githubuser/to-do-app#readme
-bug-reports:    https://github.com/githubuser/to-do-app/issues
+description:    Please see the README on GitHub at <https://github.com/zarcode/rest-to-do>
+homepage:       https://github.com/zarcode/rest-to-do
+bug-reports:    https://github.com/zarcode/rest-to-do/issues
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2021 Author name here
@@ -22,7 +22,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/to-do-app
+  location: https://github.com/zarcode/rest-to-do
 
 library
   exposed-modules:
