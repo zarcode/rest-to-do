@@ -19,7 +19,7 @@ and you are ready to "hit" some endpoints.
 
 Here are some curl examples:
 
-1. Get whole todo list: 
+1. Get the whole todo list: 
 ```
     curl --location --request GET 'http://localhost:8080/todos'
 ```
@@ -35,7 +35,7 @@ Here are some curl examples:
         "description": "description"
     }'
 ```
-3. Get single list item by id: 
+3. Get a single list item by id: 
 ```
     curl --location --request GET 'http://localhost:8080/todo/4'
 ```
