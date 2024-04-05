@@ -1,5 +1,7 @@
 # Todo List REST API in Haskell
 
+Project made with purpose of learning Haskell usage as server-side language.
+
 ## Description
 REST API with basic CRUD actions on todo list
 
